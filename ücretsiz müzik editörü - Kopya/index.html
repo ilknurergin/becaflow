@@ -2,80 +2,76 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Beca Ecosystem - Music Studio</title>
+    <title>Beca Flow - Music Studio</title>
     <style>
-        body { margin: 0; height: 200vh; background: url('yol.jpg') fixed center/cover; color: white; font-family: sans-serif; }
-        #player { position: fixed; top: 10%; left: 10%; width: 450px; background: rgba(0,0,0,0.4); backdrop-filter: blur(25px); border-radius: 30px; padding: 25px; border: 1px solid rgba(255,255,255,0.2); cursor: move; transition: 0.3s; }
-        .minimized { transform: scale(0.4); top: 10px; left: 10px; opacity: 0.8; }
-        #lyrics { height: 300px; overflow: hidden; margin: 20px 0; text-align: center; line-height: 2; font-size: 18px; color: #ccc; }
-        .active { color: #00d4ff; font-weight: bold; font-size: 22px; text-shadow: 0 0 10px #00d4ff; }
-        #library { height: 150px; overflow-y: auto; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px; margin-top: 10px; font-size: 12px; }
-        button { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 10px; cursor: pointer; }
+        body { margin: 0; min-height: 100vh; background: url('yol.jpg') fixed center/cover; color: white; font-family: sans-serif; overflow: hidden; }
+        
+        .window { position: absolute; background: rgba(0,0,0,0.5); backdrop-filter: blur(25px); border-radius: 30px; padding: 25px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: grab; min-width: 300px; min-height: 400px; resize: both; overflow: auto; }
+        
+        /* Taşıma kolu */
+        .header-bar { cursor: move; padding: 10px; margin: -25px -25px 15px -25px; background: rgba(255,255,255,0.05); border-radius: 30px 30px 0 0; text-align: center; font-size: 11px; color: #888; }
+        
+        #player { width: 450px; top: 50px; left: 50px; }
+        #google-box { width: 350px; height: 450px; top: 50px; right: 50px; display: flex; flex-direction: column; }
+        
+        /* IFRAME'in fareyi çalmaması için pointer-events ayarı */
+        #google-frame { flex-grow: 1; border: none; border-radius: 10px; pointer-events: auto; }
+        
+        #lyrics { height: 200px; overflow-y: auto; margin: 20px 0; text-align: center; color: #ccc; font-size: 16px; line-height: 1.8; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 10px 0; }
+        .active { color: #00d4ff; font-weight: bold; font-size: 19px; }
+        #library { height: 100px; overflow-y: auto; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 15px; font-size: 12px; margin-bottom: 15px; }
+        .song-item { cursor: pointer; padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        button { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 10px; border-radius: 12px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div id="player">
-        <div style="display:flex; align-items:center;">
-            <img src="kelebek.png" width="30" style="margin-right:10px;">
-            <input type="file" id="file" accept="audio/*">
+    <div id="player" class="window">
+        <div class="header-bar">Beca Music Player</div>
+        <div style="display:flex; align-items:center; margin-bottom:15px;">
+            <img src="kelebek.png" width="40" style="margin-right:15px;">
+            <input type="file" id="file" accept="audio/*" multiple>
         </div>
-        <div id="progress" style="height:5px; background:gray; margin:15px 0;"><div id="bar" style="height:100%; width:0; background:#00d4ff;"></div></div>
-        
-        <div class="controls" style="display:flex; justify-content:center; gap:5px;">
+        <div id="library"><b>Kütüphane:</b></div>
+        <div id="lyrics">Şarkı seç...</div>
+        <div style="display:flex; justify-content:center; gap:5px;">
             <button onclick="audio.currentTime -= 10">-10s</button>
             <button id="playBtn">Oynat</button>
             <button onclick="audio.currentTime += 10">+10s</button>
-            <button id="repeatBtn">↺</button>
             <button onclick="share()">📤</button>
         </div>
+        <div style="text-align:center; margin-top:15px; font-size:11px;">Producer: Ilknur Ergin<br>@becaecosystem.bsky.social</div>
+    </div>
 
-        <div id="lyrics"></div>
-        <div id="library"><b>Kütüphane:</b></div>
-        
-        <div style="text-align:center; margin-top:20px; font-size:11px;">
-            Producer: Ilknur Ergin<br>
-            <span style="color:#00d4ff;">@becaecosystem.bsky.social</span>
-        </div>
+    <div id="google-box" class="window">
+        <div class="header-bar">Google Arama</div>
+        <input type="text" id="g-search" placeholder="Google'da ara..." style="width:100%; margin-bottom:10px; padding:10px; border-radius:10px; border:none; box-sizing: border-box;">
+        <iframe id="google-frame" src="https://www.google.com/search?igu=1" sandbox="allow-forms allow-scripts allow-same-origin"></iframe>
     </div>
 
     <script>
         const audio = new Audio();
         let lyricsData = [];
-        const lyricsDiv = document.getElementById('lyrics');
-        const libDiv = document.getElementById('library');
+        
+        // TAŞIMA: Sadece .header-bar üzerinden sürükleme aktif. 
+        // Böylece resize yaparken pencereler imleci hapsetmiyor.
+        document.querySelectorAll('.header-bar').forEach(handle => {
+            handle.onmousedown = (e) => {
+                let win = handle.parentElement;
+                let sX = e.clientX - win.offsetLeft, sY = e.clientY - win.offsetTop;
+                const move = (e) => { win.style.left = e.clientX - sX + 'px'; win.style.top = e.clientY - sY + 'px'; };
+                document.addEventListener('mousemove', move);
+                document.onmouseup = () => document.removeEventListener('mousemove', move);
+            };
+        });
 
-        document.getElementById('file').onchange = async (e) => {
-            const file = e.target.files[0];
-            audio.src = URL.createObjectURL(file);
-            audio.play();
-            
-            // Kütüphaneye ekle
-            libDiv.innerHTML += `<div>${file.name}</div>`;
-
-            // Söz çekme
-            const name = file.name.replace(/\.[^/.]+$/, "");
-            const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(name)}`);
-            const data = await res.json();
-            if(data[0]?.syncedLyrics) {
-                lyricsData = data[0].syncedLyrics.split('\n').map(l => {
-                    const m = l.match(/\[(\d+):(\d+\.\d+)\](.*)/);
-                    return m ? { t: parseInt(m[1])*60 + parseFloat(m[2]), text: m[3] } : null;
-                }).filter(l => l);
-            }
-        };
-
-        audio.ontimeupdate = () => {
-            document.getElementById('bar').style.width = (audio.currentTime / audio.duration * 100) + '%';
-            const active = lyricsData.filter(l => l.t <= audio.currentTime).slice(-3);
-            lyricsDiv.innerHTML = active.map((l, i) => `<div class="${i === 2 ? 'active' : ''}">${l.text}</div>`).join('');
-        };
-
-        function share() {
-            window.open("https://bsky.app/intent/compose?text=Beca Ecosystem'de dinliyorum!");
-        }
-
-        document.getElementById('playBtn').onclick = () => audio.paused ? audio.play() : audio.pause();
-        window.onscroll = () => document.getElementById('player').classList.toggle('minimized', window.scrollY > 50);
+        // Diğer fonksiyonlar (Söz, Dosya seçme vb.)
+        async function fetchLyrics(name) { lyricsData = []; try { const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(name)}`); const data = await res.json(); if(data && data.length > 0 && data[0].syncedLyrics) { lyricsData = data[0].syncedLyrics.split('\n').map(l => { const m = l.match(/\[(\d+):(\d+\.\d+)\](.*)/); return m ? { t: parseInt(m[1])*60 + parseFloat(m[2]), text: m[3] } : null; }).filter(l => l); } } catch (e) {} }
+        document.getElementById('file').onchange = (e) => { Array.from(e.target.files).forEach((f, i) => { const url = URL.createObjectURL(f); const name = f.name.replace(/\.[^/.]+$/, ""); document.getElementById('library').innerHTML += `<div class="song-item" onclick="play('${url}', '${name}')">▶ ${name}</div>`; if(i === 0) play(url, name); }); };
+        function play(url, name) { audio.src = url; audio.play(); fetchLyrics(name); }
+        audio.ontimeupdate = () => { const active = lyricsData.filter(l => l.t <= audio.currentTime).slice(-3); document.getElementById('lyrics').innerHTML = active.map((l, i) => `<div class="${i === 2 ? 'active' : ''}">${l.text}</div>`).join(''); };
+        document.getElementById('g-search').onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('google-frame').src = `https://www.google.com/search?q=${encodeURIComponent(e.target.value)}&igu=1`; };
+        function share() { window.open("https://bsky.app/intent/compose?text=Beca Flow 🎶"); }
+        document.getElementById('playBtn').onclick = () => { audio.paused ? audio.play() : audio.pause(); };
     </script>
 </body>
 </html>
