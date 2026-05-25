@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Beca Flow - Music Studio</title>
+    <style>
+        body { margin: 0; height: 100vh; background: url('yol.jpg') fixed center/cover; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; }
+        #player { width: 450px; background: rgba(0,0,0,0.5); backdrop-filter: blur(25px); border-radius: 30px; padding: 30px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #lyrics { height: 200px; overflow-y: auto; margin: 20px 0; text-align: center; color: #ccc; font-size: 16px; line-height: 1.8; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 10px 0; }
+        .active { color: #00d4ff; font-weight: bold; font-size: 19px; }
+        #library { height: 100px; overflow-y: auto; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 15px; font-size: 12px; margin-bottom: 15px; }
+        .song-item { cursor: pointer; padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .song-item:hover { color: #00d4ff; padding-left: 10px; }
+        button { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 10px; border-radius: 12px; cursor: pointer; transition: 0.3s; }
+        button:hover { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <div id="player">
+        <div style="display:flex; align-items:center; margin-bottom:15px;">
+            <img src="kelebek.png" width="40" style="margin-right:15px;">
+            <input type="file" id="file" accept="audio/*" multiple>
+        </div>
+        
+        <div id="library"><b>Kütüphane:</b></div>
+        <div id="lyrics">Şarkı seç, sözler gelsin...</div>
+        
+        <div style="display:flex; justify-content:center; gap:5px; flex-wrap:wrap;">
+            <button onclick="audio.currentTime -= 10">-10s</button>
+            <button id="playBtn">Oynat</button>
+            <button onclick="audio.currentTime += 10">+10s</button>
+            <button id="repeatBtn">↺</button>
+            <button onclick="share()">📤</button>
+        </div>
+        
+        <div style="text-align:center; margin-top:15px; font-size:11px;">
+            Producer: Ilknur Ergin<br>
+            <span style="color:#00d4ff;">@becaecosystem.bsky.social</span>
+        </div>
+    </div>
+
+    <script>
+        const audio = new Audio();
+        let lyricsData = [];
+        const lyricsDiv = document.getElementById('lyrics');
+        const libDiv = document.getElementById('library');
+        const repeatBtn = document.getElementById('repeatBtn');
+
+        // Tekrar butonu mantığı
+        repeatBtn.onclick = () => {
+            audio.loop = !audio.loop;
+            repeatBtn.style.color = audio.loop ? '#00d4ff' : 'white';
+        };
+
+        async function fetchLyrics(name) {
+            lyricsDiv.innerHTML = "Sözler aranıyor...";
+            try {
+                const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(name)}`);
+                const data = await res.json();
+                if(data && data.length > 0) {
+                    if(data[0].syncedLyrics) {
+                        lyricsData = data[0].syncedLyrics.split('\n').map(l => {
+                            const m = l.match(/\[(\d+):(\d+\.\d+)\](.*)/);
+                            return m ? { t: parseInt(m[1])*60 + parseFloat(m[2]), text: m[3] } : null;
+                        }).filter(l => l);
+                    } else {
+                        lyricsDiv.innerText = data[0].plainLyrics || "Söz bulunamadı.";
+                        lyricsData = [];
+                    }
+                } else { lyricsDiv.innerHTML = "Söz bulunamadı."; }
+            } catch (e) { lyricsDiv.innerHTML = "Hata."; }
+        }
+
+        document.getElementById('file').onchange = (e) => {
+            Array.from(e.target.files).forEach((file, index) => {
+                const url = URL.createObjectURL(file);
+                const name = file.name.replace(/\.[^/.]+$/, "");
+                libDiv.innerHTML += `<div class="song-item" onclick="playExisting('${url}', '${name}')">▶ ${name}</div>`;
+                if(index === 0) playExisting(url, name);
+            });
+        };
+
+        function playExisting(url, name) {
+            audio.src = url;
+            audio.play();
+            document.getElementById('playBtn').innerText = 'Duraklat';
+            fetchLyrics(name);
+        }
+
+        audio.ontimeupdate = () => {
+            if(lyricsData.length > 0) {
+                const active = lyricsData.filter(l => l.t <= audio.currentTime).slice(-3);
+                lyricsDiv.innerHTML = active.map((l, i) => `<div class="${i === 2 ? 'active' : ''}">${l.text}</div>`).join('');
+            }
+        };
+
+        function share() {
+            window.open("https://bsky.app/intent/compose?text=Beca Flow'da şu an müzik dinliyorum! @becaecosystem.bsky.social 🎶");
+        }
+
+        document.getElementById('playBtn').onclick = () => {
+            audio.paused ? audio.play() : audio.pause();
+            document.getElementById('playBtn').innerText = audio.paused ? 'Oynat' : 'Duraklat';
+        };
+    </script>
+</body>
+</html>
